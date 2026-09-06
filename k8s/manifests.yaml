@@ -1,0 +1,55 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: heart-api-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: heart-api
+  strategy:
+    type: Recreate # CRITICAL for e2-small clusters to avoid resource locks
+  template:
+    metadata:
+      labels:
+        app: heart-api
+    spec:
+      containers:
+      - name: heart-api
+        image: IMAGE_PLACEHOLDER # GitHub Actions will inject the real URI here
+        ports:
+        - containerPort: 8000
+        resources:
+          requests:
+            cpu: "100m" # CRITICAL for the HPA to calculate metrics
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: heart-api-service
+spec:
+  type: LoadBalancer
+  selector:
+    app: heart-api
+  ports:
+  - port: 80
+    targetPort: 8000
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: heart-api-hpa
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: heart-api-deployment
+  minReplicas: 1
+  maxReplicas: 3 # RUBRIC REQUIREMENT: Max 3 pods
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 50
